@@ -31,6 +31,9 @@
 #include "sf.h"             /* 旧版 SF 控制环：FWControl、PTstate、alldeal、commandprocess */
 #include "GEO_Track_C.h"    /* 地理引导：GeoLos_CalcAbsAngle */
 
+#include "rtk_nmea_rx.h"
+#include "rtk_nmea_parse.h"
+
 #include "Bsp/bsp_flash.h"  /* 光电校正参数 Sector10 持久化 */
 
 #ifndef M_PI
@@ -121,6 +124,12 @@ static USER_Ctrl_OptCalibFlash_t s_opt_calib_flash;
 /* -------------------------------------------------------------------------- */
 
 static void CMD_Dataanalysis(CMD_220_T *cmd_struct);
+
+/** 角度制 → 弧度 */
+double deg__(double deg)
+{
+    return deg * M_PI / 180.0;
+}
 
 /** 图像板伺服指令处理，cmd 码见 SF.h（0x01~0x0A） */
 static void CMD_REC_Brake(uint8_t *data);
@@ -234,6 +243,48 @@ void GEO(void)
 {
     GeoLos_CalcAbsAngle(&lxy_self, &lxy_target, &lxy_out);
 }
+/**
+ * @brief 将 RTK 解析结果写入 lxy_self / INS（各子字段须 valid 才更新）
+ *
+ * 更新策略（无效时保留 Flash 校正或上次有效值）：
+ *   gga.valid && qual==RTK Fixed → lxy_self 经纬高 + INS 位置
+ *   tra.valid (GNHPR QF==4)      → INS.Yaw / Pitch / Roll
+ *   hdt.valid (GPHDT T)          → GNHPR 无效时 fallback 更新 INS.Yaw
+ */
+static void APP_RtkNmea_Apply(void)
+{
+    const RtkNmea_Data_t *rtk = &g_rtk_nmea_data;
+    uint8_t pos_updated = 0U;
+
+    if ((rtk->gga.valid != 0U) &&
+        (rtk->gga.qual == (uint8_t)RTK_NMEA_QUAL_SPP))
+    {
+        lxy_self.lat_deg = (float)rtk->gga.lat_deg;
+        lxy_self.lon_deg = (float)rtk->gga.lon_deg;
+        lxy_self.alt_m   = rtk->gga.alt_m;
+
+        INS.height    = (double)rtk->gga.alt_m;
+        INS.lattitude = deg__((float)rtk->gga.lat_deg);
+        INS.longitude = deg__((float)rtk->gga.lon_deg);
+        pos_updated = 1U;
+    }
+
+    if (rtk->tra.valid != 0U)
+    {
+        INS.Yaw   = rtk->tra.heading_deg;
+//        INS.Pitch = rtk->tra.pitch_deg;
+//        INS.Roll  = rtk->tra.roll_deg;
+    }
+    else if (rtk->hdt.valid != 0U)
+    {
+        INS.Yaw = rtk->hdt.heading_deg;
+    }
+
+//    if (pos_updated != 0U)
+//    {
+//        GEO();
+//    }
+}
 
 /** 遗留 SF 结构体，当前文件未直接使用 */
 INSTypeDef INS_ = {0};
@@ -243,11 +294,7 @@ OrientLoadTypeDef OrientLoad_ = {0};
 /** 默认 INS 坐标（调试/仿真用） */
 double INS_longitude = 103.908940683563, INS_lattitude = 30.823423234, Targetheight = 1000;
 
-/** 角度制 → 弧度 */
-double deg__(double deg)
-{
-    return deg * M_PI / 180.0;
-}
+
 
 double jing, wei;
 uint32_t time_flag = 0;
@@ -889,6 +936,16 @@ void APP_Ctrl_System_Init(void)
     /* USART2：方位板，同上 */
     HAL_UART_Receive_DMA(&huart2, u2_rx_buff, sizeof(u2_rx_buff));
     SET_BIT((&huart2)->Instance->CR1, USART_CR1_IDLEIE);
+	
+	/* USART6：RTK NMEA，逻辑串口 0 */
+    RtkNmea_Rx_Init();
+
+//    /* BT-982G1：开启 GPHDT 1Hz 航向输出（HEADING 模式） */
+//    {
+//        static const uint8_t s_rtk_cmd_gphdt[] = "GPHDT 0.05\n";
+//        (void)HAL_UART_Transmit(&huart6, (uint8_t *)s_rtk_cmd_gphdt,
+//                                (uint16_t)(sizeof(s_rtk_cmd_gphdt) - 1U), 100U);
+//    }
 
     /* TIM6 提供 1ms 时基，驱动 ms 计数与周期任务 */
     HAL_TIM_Base_Start_IT(&htim6);
@@ -959,6 +1016,8 @@ void APP_Ctrl_System_Handle(void)
     ADC_GET_Handle();                /* ADC 采集完成处理 */
     RECEIVE_IMAGE_CMD_Handle();      /* 图像板指令解析（事件驱动） */
     RECEIVE_FW_CMD_Handle();         /* 方位板状态更新（事件驱动） */
+	RtkNmea_Rx_Process();            /* RTK NMEA 变长帧解析 */
+    APP_RtkNmea_Apply();             /* valid 时写入 lxy_self / INS */
 
     /* 调试：手动触发引导 */
     if (debug_) {
@@ -1055,6 +1114,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
         if (APP_Uart_RxDmaRestart(&huart2, u2_rx_buff, (uint16_t)sizeof(u2_rx_buff)) != HAL_OK) {
             (void)APP_Uart_RxDmaRestart(&huart2, u2_rx_buff, (uint16_t)sizeof(u2_rx_buff));
         }
+    }
+	
+	/* ---------- USART6：RTK NMEA，DMA 满 512B 时 HAL 回调 ---------- */
+    if (huart == &huart6) {
+        RtkNmea_Rx_DmaCpltHandler();
+        return;
     }
 }
 

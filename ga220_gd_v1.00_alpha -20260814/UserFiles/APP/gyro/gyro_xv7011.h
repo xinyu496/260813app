@@ -1,0 +1,19 @@
+#ifndef __GYRO_XV7011_H
+#define __GYRO_XV7011_H
+#define SPI1_CS2_Pin GPIO_PIN_0
+#define SPI1_CS2_GPIO_Port GPIOA
+#define SPI1_CS1_Pin GPIO_PIN_4
+#define SPI1_CS1_GPIO_Port GPIOA
+#define SPI1_CS3_Pin GPIO_PIN_1
+#define SPI1_CS3_GPIO_Port GPIOA
+
+#define SPI1_CS1_enable  HAL_GPIO_WritePin(SPI1_CS1_GPIO_Port, SPI1_CS1_Pin, GPIO_PIN_RESET)
+#define SPI1_CS1_disable HAL_GPIO_WritePin(SPI1_CS1_GPIO_Port, SPI1_CS1_Pin, GPIO_PIN_SET)
+
+#define SPI1_CS2_enable  HAL_GPIO_WritePin(SPI1_CS2_GPIO_Port, SPI1_CS2_Pin, GPIO_PIN_RESET)
+#define SPI1_CS2_disable HAL_GPIO_WritePin(SPI1_CS2_GPIO_Port, SPI1_CS2_Pin, GPIO_PIN_SET)
+
+#define SPI1_CS3_enable  HAL_GPIO_WritePin(SPI1_CS3_GPIO_Port, SPI1_CS3_Pin, GPIO_PIN_RESET)
+#define SPI1_CS3_disable HAL_GPIO_WritePin(SPI1_CS3_GPIO_Port, SPI1_CS3_Pin, GPIO_PIN_SET)
+
+#endif

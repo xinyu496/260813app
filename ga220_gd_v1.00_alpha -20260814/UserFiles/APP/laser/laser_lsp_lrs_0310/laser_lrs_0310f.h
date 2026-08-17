@@ -1,0 +1,167 @@
+#ifndef __LASER_LRS_0310F_H
+#define __LASER_LRS_0310F_H
+#include "Common/base_inc.h"
+#include "Common/config.h"
+
+/*模块开关*/
+#if LASER_LRS_0310F
+
+typedef enum
+{
+    LASER_DATA_STOP = 0x0,					/*测距停止*/
+    LASER_PERIOD_SELF_CHECK = 0x1,			/*周期自检*/
+    LASER_SINGLE_DETECT = 0x2,				/*单次测距*/
+    LASER_DETECT_FREQ_1 = 0x3,				/*1hz测距*/
+    LASER_DETECT_FREQ_5 = 0x4,				/*5hz测距*/
+    LASER_DETECT_PRECISION = 0x5,			/*精频码照射*/
+    LASER_DETECT_CHANGE_INTERVAL = 0x6,		/*变间隔码照射*/
+    LASER_DETECT_PLUSE = 0x7,				/*脉冲序列码照射*/
+    LASER_DEST_MODE_CHOOSE = 0x8,			/*目标模式选择*/
+    LASER_RANGE_CFG = 0x9,					/*选通值设置*/
+    LASER_LIGHT_TIME_REQ = 0xa,				/*出光次数查询*/
+    LASER_LIGHT_EXT = 0xb,					/*外触发照射*/
+    LASER_APD_POWER_ENABLE = 0xc,			/*APD电源开关*/
+    LASER_CODE_ENABLE = 0x0D,				/*编码装订开关*/
+    LASER_SELF_DESTROY = 0x0E,				/*编码自毁命令*/
+    LASER_VERSION_CHECK = 0x10,				/*版本查询指令*/
+    LASER_DETECT_DELAYSET = 0x11,			/*照射延时设置*/
+    LASER_ENERGY_CFG = 0x12,				/*能量设置*/
+    LASER_STATIC_DYNAMIC_CFG = 0x13,		/*动静态设置*/
+    LASER_RESET = 0xFE,						/*恢复出厂设置*/
+    LASER_UPGRADE = 0xFF,					/*程序升级*/
+
+    /*二级指令交互*/
+    LASER_CHANGE_INTERVAL_CFG = 0x30,		/*变间隔码设置*/
+    LASER_CHANGE_INTERVAL_ACK = 0x31,		/*变间隔码查询回复*/
+
+    LASER_PULSE_CFG = 0x32,		/*脉冲序列写入*/
+    LASER_PULSE_ACK = 0x33,		/*脉冲序列写入回复*/
+
+    LASER_PRECISSION_CFG = 0x34, /*精确频率码写入*/
+    LASER_PRECISSION_ACK = 0x35, /*精确频率码写入回复*/
+
+    LASER_CMD_END,/*枚举边界*/
+} LASER_DATA_IN_TYPE_INFO;
+
+#pragma pack(1)
+typedef struct
+{
+    uint8_t header;
+    uint8_t cmd_type1;
+    uint8_t cmd_type2;
+    uint8_t set_data1;
+    uint8_t set_data2;
+    uint8_t sum_check;
+}LZ_LRS_SEND_T;	/*激光发送报文结构体*/
+#pragma pack()
+
+#pragma pack(1)
+typedef struct
+{
+    uint8_t Header;        	/*帧头*/
+    uint8_t Ctrl_Cmd;		/*控制命令*/
+	uint8_t len;			/*长度*/
+    uint8_t CtrlData[10];	/*控制数据*/
+    uint8_t Xor;			/*校验（异或）*/
+} LASER_DATA_IN_EB_T; /*激光接收报文结构体*/
+#pragma pack()
+#define LASER_IN_DATA_LEN  sizeof(LASER_DATA_IN_EB_T)
+
+//#pragma pack(1)
+//typedef struct
+//{
+//    uint8_t target1_status:1;	/*后目标 1有 0无*/
+//    uint8_t target2_status:1;	/*前目标 1有 0无*/
+//    uint8_t apd_status:1;		/*apd 1正常 0错误*/
+//    uint8_t null_status:1;		/*无效状态 置为1*/
+//    uint8_t timeout_status:1;	/*超时状态 1正常 0超时*/
+//    uint8_t laser_status:1;		/*激光状态 1正常 0故障*/
+//    uint8_t echo_status:1;		/*回波 1有 0无*/
+//    uint8_t main_lobe:1;		/*主波 1有 0无*/
+//} LASER_RECV_DETECT_T; /*激光测距状态*/
+//#pragma pack()
+
+typedef struct
+{
+    uint8_t laser_status:2;
+    uint8_t static_status:1;
+    uint8_t light_status:1;
+    uint8_t pd_err:1;
+    uint8_t temp_err:1;
+    uint8_t high_temp_alarm:1;
+    uint8_t system_status:1;
+} LASER_SELF_CHECK_2_T;
+
+#pragma pack(1)
+typedef struct
+{
+    LASER_SELF_CHECK_2_T laser_status1;
+    LASER_SELF_CHECK_2_T laser_status2;
+    uint16_t choose_range_value;
+    uint8_t environ_temp;
+    uint8_t ld_temp;
+    uint16_t apd_vol;
+    uint8_t power_rate;
+    uint16_t light_delay;
+} LASER_SELF_CHECK_T;
+#pragma pack()
+
+#pragma pack(1)
+typedef struct
+{
+    LASER_SELF_CHECK_2_T laser_status1;
+    LASER_SELF_CHECK_2_T laser_status2;
+    uint16_t dest_distance;
+    uint8_t environ_temp;
+    uint8_t ld_temp;
+    uint16_t light_cnt;
+    uint8_t laser_power;
+    uint8_t ld_pulse;
+    uint8_t res;
+} LASER_RECV_DETECT_T;
+#pragma pack()
+
+/*============================================
+*FUNCTION NAME:
+*DISCRIPTION:
+*PARAMETERS:
+*RETURN:
+*N/A
+*NOTES:
+*HISTORY:
+*==============================================================*/
+void LASER_API_Serial_Data_Init(void);
+/*==============================================================
+*FUNCTION NAME:
+*DISCRIPTION:
+*PARAMETERS:
+*RETURN:
+*N/A
+*NOTES:
+*HISTORY:
+*==============================================================*/
+uint8_t LASER_API_Period_Handle(void);
+/*==============================================================
+*FUNCTION NAME:
+*DISCRIPTION:
+*PARAMETERS:
+*RETURN:
+*N/A
+*NOTES:
+*HISTORY:
+*==============================================================*/
+uint8_t Laser_Ctrl_SendHandle(SYS_LASER_DETECT_MODE_E cmd,uint16_t cmd_para1,uint16_t cmd_para2);
+uint8_t Laser_Ctrl_Send_Lrd_Handle(SYS_LASER_DETECT_MODE_E cmd,uint16_t cmd_para1,uint16_t cmd_para2);
+uint8_t Laser_Ctrl_Send_Ld_Handle(SYS_LASER_DETECT_MODE_E cmd,uint16_t cmd_para1,uint16_t cmd_para2);
+/*==============================================================
+*FUNCTION NAME:
+*DISCRIPTION:
+*PARAMETERS:
+*RETURN:
+*N/A
+*NOTES:
+*HISTORY:
+*==============================================================*/
+uint8_t laser_process_data_in(uint8_t *data,uint32_t length);
+#endif
+#endif
